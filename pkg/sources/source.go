@@ -31,9 +31,9 @@ import (
 	"github.com/numaproj/numaflow/pkg/isbsvc"
 	"github.com/numaproj/numaflow/pkg/metrics"
 	"github.com/numaproj/numaflow/pkg/sdkclient"
+	sdkserverinfo "github.com/numaproj/numaflow/pkg/sdkclient/serverinfo"
 	sourceclient "github.com/numaproj/numaflow/pkg/sdkclient/source"
 	"github.com/numaproj/numaflow/pkg/sdkclient/sourcetransformer"
-	"github.com/numaproj/numaflow/pkg/sdkserverinfo"
 	jsclient "github.com/numaproj/numaflow/pkg/shared/clients/nats"
 	redisclient "github.com/numaproj/numaflow/pkg/shared/clients/redis"
 	"github.com/numaproj/numaflow/pkg/shared/logging"
@@ -142,7 +142,7 @@ func (sp *SourceProcessor) Start(ctx context.Context) error {
 		}
 
 		// created watermark related components only if watermark is enabled
-		// otherwise no op will used
+		// otherwise no op will be used
 		if !sp.VertexInstance.Vertex.Spec.Watermark.Disabled {
 			// build watermark stores for from vertex
 			sourceWmStores, err = jetstream.BuildFromVertexWatermarkStores(ctx, sp.VertexInstance, natsClientPool.NextAvailableClient())
@@ -186,7 +186,7 @@ func (sp *SourceProcessor) Start(ctx context.Context) error {
 	var udsGRPCClient *udsource.GRPCBasedUDSource
 	if sp.VertexInstance.Vertex.IsUDSource() {
 		// Wait for server info to be ready
-		serverInfo, err := sdkserverinfo.SDKServerInfo(sdkserverinfo.WithServerInfoFilePath(sdkserverinfo.SourceServerInfoFile))
+		serverInfo, err := sdkserverinfo.SDKServerInfo(sdkserverinfo.WithServerInfoFilePath(sdkclient.SourceServerInfoFile))
 		if err != nil {
 			return err
 		}
@@ -202,7 +202,7 @@ func (sp *SourceProcessor) Start(ctx context.Context) error {
 		}
 		// Readiness check
 		if err = udsGRPCClient.WaitUntilReady(ctx); err != nil {
-			return fmt.Errorf("failed on user defined source readiness check, %w", err)
+			return fmt.Errorf("failed on user-defined source readiness check, %w", err)
 		}
 		defer func() {
 			err = udsGRPCClient.CloseConn(ctx)
@@ -216,7 +216,7 @@ func (sp *SourceProcessor) Start(ctx context.Context) error {
 	var err error
 	if sp.VertexInstance.Vertex.HasUDTransformer() {
 		// Wait for server info to be ready
-		serverInfo, err := sdkserverinfo.SDKServerInfo(sdkserverinfo.WithServerInfoFilePath(sdkserverinfo.SourceTransformerServerInfoFile))
+		serverInfo, err := sdkserverinfo.SDKServerInfo(sdkserverinfo.WithServerInfoFilePath(sdkclient.SourceTransformerServerInfoFile))
 		if err != nil {
 			return err
 		}
@@ -238,13 +238,13 @@ func (sp *SourceProcessor) Start(ctx context.Context) error {
 
 		// Readiness check
 		if err = transformerGRPCClient.WaitUntilReady(ctx); err != nil {
-			return fmt.Errorf("failed on user defined source readiness check, %w", err)
+			return fmt.Errorf("failed on user-defined source readiness check, %w", err)
 		}
 
 		readyCheckers = append(readyCheckers, transformerGRPCClient)
 		source, err = sp.getSourcer(writersMap, sp.getTransformerGoWhereDecider(shuffleFuncMap), transformerGRPCClient, udsGRPCClient, fetchWatermark, toVertexWatermarkStores, sourcePublisherStores, idleManager, log)
 	} else {
-		source, err = sp.getSourcer(writersMap, sp.getSourceGoWhereDecider(shuffleFuncMap), applier.Terminal, udsGRPCClient, fetchWatermark, toVertexWatermarkStores, sourcePublisherStores, idleManager, log)
+		source, err = sp.getSourcer(writersMap, sp.getSourceGoWhereDecider(shuffleFuncMap), nil, udsGRPCClient, fetchWatermark, toVertexWatermarkStores, sourcePublisherStores, idleManager, log)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to find a source, error: %w", err)
