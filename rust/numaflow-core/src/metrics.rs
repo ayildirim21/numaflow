@@ -559,12 +559,13 @@ impl SQSMetrics {
                 ),
                 publish_success: Family::<Vec<(String, String)>, Counter>::default(),
                 publish_failure: Family::<Vec<(String, String)>, Counter>::default(),
-            }
+            },
         };
 
         let mut registry = global_registry().registry.lock();
         let sqs_registry = registry.sub_registry_with_prefix(SQS_REGISTRY_PREFIX);
-        let producer_registery = sqs_registry.sub_registry_with_prefix(SQS_PRODUCER_REGISTRY_PREFIX);
+        let producer_registery =
+            sqs_registry.sub_registry_with_prefix(SQS_PRODUCER_REGISTRY_PREFIX);
 
         producer_registery.register(
             SQS_PRODUCER_PUBLISH_LATENCY,
@@ -581,7 +582,7 @@ impl SQSMetrics {
         producer_registery.register(
             SQS_PRODUCER_PUBLISH_FAILURE_TOTAL,
             "Number of messages that failed to publish to SQS",
-            metrics.producer.publish_failure.clone()
+            metrics.producer.publish_failure.clone(),
         );
 
         metrics

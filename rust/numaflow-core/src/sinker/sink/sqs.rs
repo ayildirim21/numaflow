@@ -1,14 +1,14 @@
-use std::time::Instant;
 use numaflow_sqs::{
     SQS_METADATA_KEY,
     sink::{SqsSink, SqsSinkMessage},
 };
+use std::time::Instant;
 
 use crate::error;
 use crate::error::Error;
 use crate::message::Message;
-use crate::sinker::sink::{ResponseFromSink, ResponseStatusFromSink, Sink};
 use crate::metrics::sqs_metrics;
+use crate::sinker::sink::{ResponseFromSink, ResponseStatusFromSink, Sink};
 
 impl TryFrom<Message> for SqsSinkMessage {
     type Error = error::Error;
@@ -76,7 +76,11 @@ impl Sink for SqsSink {
         let sqs_sink_result = self.sink_messages(sqs_messages).await;
         let elapsed = start.elapsed().as_micros() as f64;
 
-        sqs_metrics().producer.publish_latency.get_or_create(&labels).observe(elapsed);
+        sqs_metrics()
+            .producer
+            .publish_latency
+            .get_or_create(&labels)
+            .observe(elapsed);
 
         if let Err(e) = sqs_sink_result {
             sqs_metrics()
