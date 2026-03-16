@@ -156,7 +156,7 @@ These metrics are emitted by pipeline vertex pods for NATS JetStream Inter-Step 
 
 ## SQS Metrics
 
-These metrics are emitted when using SQS as a sink.
+These metrics are emitted when using SQS.
 
 ### Producer Metrics
 
