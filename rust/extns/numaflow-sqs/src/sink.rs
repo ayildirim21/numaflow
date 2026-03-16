@@ -98,6 +98,7 @@ impl TryFrom<BatchEntryInput> for SendMessageBatchRequestEntry {
 pub struct SqsSink {
     client: Client,
     queue_url: &'static str,
+    /// The name of the SQS queue, used as a label in metrics.
     pub queue_name: &'static str,
 }
 
