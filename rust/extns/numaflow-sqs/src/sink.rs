@@ -98,6 +98,7 @@ impl TryFrom<BatchEntryInput> for SendMessageBatchRequestEntry {
 pub struct SqsSink {
     client: Client,
     queue_url: &'static str,
+    pub queue_name: &'static str,
 }
 
 /// Builder for creating and configuring an SQS sink.
@@ -195,6 +196,7 @@ impl SqsSinkBuilder {
         Ok(SqsSink {
             client: sqs_client.clone(),
             queue_url: Box::leak(queue_url.clone().to_string().into_boxed_str()),
+            queue_name: self.config.queue_name,
         })
     }
 }
