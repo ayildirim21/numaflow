@@ -33,6 +33,9 @@ use crate::sinker::sink::SinkWriter;
 use crate::source::Source;
 use crate::watermark::WatermarkHandle;
 
+pub(crate) mod sqs;
+pub(crate) use sqs::sqs_metrics;
+
 // SDK information
 const SDK_INFO: &str = "sdk_info";
 const COMPONENT: &str = "component";
@@ -150,13 +153,6 @@ const ON_SUCCESS_SINK_TIME: &str = "time";
 const JETSTREAM_ISB_READ_TIME_TOTAL: &str = "read_time_total";
 const JETSTREAM_ISB_WRITE_TIME_TOTAL: &str = "write_time_total";
 const JETSTREAM_ISB_ACK_TIME_TOTAL: &str = "ack_time_total";
-
-// SQS related metric configs
-const SQS_REGISTRY_PREFIX: &str = "sqs";
-const SQS_PRODUCER_REGISTRY_PREFIX: &str = "producer";
-const SQS_PRODUCER_PUBLISH_SUCCESS_TOTAL: &str = "publish_success";
-const SQS_PRODUCER_PUBLISH_FAILURE_TOTAL: &str = "publish_failure";
-const SQS_PRODUCER_PUBLISH_LATENCY: &str = "publish_latency";
 
 /// A deep healthcheck for components. Each component should implement IsReady for both builtins and
 /// user-defined containers.
@@ -540,55 +536,6 @@ impl JetStreamISBMetrics {
     }
 }
 
-pub(crate) struct SQSProducerMetrics {
-    pub(crate) publish_latency: Family<Vec<(String, String)>, Histogram>,
-    pub(crate) publish_success: Family<Vec<(String, String)>, Counter>,
-    pub(crate) publish_failure: Family<Vec<(String, String)>, Counter>,
-}
-
-pub(crate) struct SQSMetrics {
-    pub(crate) producer: SQSProducerMetrics,
-}
-
-impl SQSMetrics {
-    pub(crate) fn new() -> Self {
-        let metrics = Self {
-            producer: SQSProducerMetrics {
-                publish_latency: Family::<Vec<(String, String)>, Histogram>::new_with_constructor(
-                    || Histogram::new(exponential_buckets_range(100.0, 60000000.0 * 15.0, 10)),
-                ),
-                publish_success: Family::<Vec<(String, String)>, Counter>::default(),
-                publish_failure: Family::<Vec<(String, String)>, Counter>::default(),
-            },
-        };
-
-        let mut registry = global_registry().registry.lock();
-        let sqs_registry = registry.sub_registry_with_prefix(SQS_REGISTRY_PREFIX);
-        let producer_registery =
-            sqs_registry.sub_registry_with_prefix(SQS_PRODUCER_REGISTRY_PREFIX);
-
-        producer_registery.register(
-            SQS_PRODUCER_PUBLISH_LATENCY,
-            "Latency of SQS publish operations in microseconds",
-            metrics.producer.publish_latency.clone(),
-        );
-
-        producer_registery.register(
-            SQS_PRODUCER_PUBLISH_SUCCESS_TOTAL,
-            "Number of messages successfully published to SQS",
-            metrics.producer.publish_success.clone(),
-        );
-
-        producer_registery.register(
-            SQS_PRODUCER_PUBLISH_FAILURE_TOTAL,
-            "Number of messages that failed to publish to SQS",
-            metrics.producer.publish_failure.clone(),
-        );
-
-        metrics
-    }
-}
-
 /// Exponential bucket distribution with range.
 /// Creates `length` buckets, where the lowest bucket is `min` and the highest bucket is `max`.
 /// The final +Inf bucket is not counted and not included in the returned iterator.
@@ -788,8 +735,8 @@ impl MonoVtxMetrics {
             metrics.fb_sink.write_total.clone(),
         );
         fb_sink_registry.register(FALLBACK_SINK_TIME,
-            "A Histogram to keep track of the total time taken to Write to the fallback sink, in microseconds",
-            metrics.fb_sink.time.clone());
+                                  "A Histogram to keep track of the total time taken to Write to the fallback sink, in microseconds",
+                                  metrics.fb_sink.time.clone());
 
         // OnSuccess Sink metrics
         let ons_sink_registry = registry.sub_registry_with_prefix(ON_SUCCESS_SINK_REGISTRY_PREFIX);
@@ -800,8 +747,8 @@ impl MonoVtxMetrics {
             metrics.ons_sink.write_total.clone(),
         );
         ons_sink_registry.register(ON_SUCCESS_SINK_TIME,
-                                  "A Histogram to keep track of the total time taken to Write to the on-success sink, in microseconds",
-                                  metrics.ons_sink.time.clone());
+                                   "A Histogram to keep track of the total time taken to Write to the on-success sink, in microseconds",
+                                   metrics.ons_sink.time.clone());
 
         metrics
     }
@@ -1117,11 +1064,6 @@ static PIPELINE_METRICS: OnceLock<PipelineMetrics> = OnceLock::new();
 // PipelineMetrics object
 pub(crate) fn pipeline_metrics() -> &'static PipelineMetrics {
     PIPELINE_METRICS.get_or_init(PipelineMetrics::new)
-}
-
-static SQS_METRICS: OnceLock<SQSMetrics> = OnceLock::new();
-pub(crate) fn sqs_metrics() -> &'static SQSMetrics {
-    SQS_METRICS.get_or_init(SQSMetrics::new)
 }
 
 // sdk_info_labels is a helper function used to build the labels used in sdk_info
