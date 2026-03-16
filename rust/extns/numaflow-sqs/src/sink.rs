@@ -342,6 +342,8 @@ mod tests {
             sink.queue_url,
             "https://sqs.us-west-2.amazonaws.com/926113353675/test-q/"
         );
+        
+        assert_eq!(sink.queue_name, "test-q");
     }
 
     #[test(tokio::test)]
